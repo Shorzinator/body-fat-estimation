@@ -4,7 +4,7 @@ import os
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def get_path_from_root(*subdirs):
+def get_path_from_root(directory, filename=None):
     """
     Construct a path based on the root directory.
 
@@ -14,8 +14,11 @@ def get_path_from_root(*subdirs):
     Returns:
     str: Full path from the root directory
     """
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(ROOT_DIR, *subdirs)
+    root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if filename:
+        return os.path.join(root_dir, directory, filename)
+    else:
+        return os.path.join(root_dir, directory)
 
 
 def get_data_path(filename):
@@ -28,4 +31,4 @@ def get_data_path(filename):
     Returns:
     str: Full path to the data file from the root directory
     """
-    return get_path_from_root("data", "raw", filename)
+    return get_path_from_root("data\\raw", filename)
