@@ -25,6 +25,9 @@ def distribution(data):
             plt.savefig(os.path.join(get_path_from_root('image', 'EDA', 'distribution_visualization'),
                                      f'{column}_distribution.png'), dpi=500, bbox_inches='tight')
 
+            skewness_values = data.skew()
+            skewness_values.to_csv()
+
 
 # 3. Outlier Detection
 def outlier_detection():
