@@ -1,11 +1,10 @@
 import numpy as np
 import pandas as pd
-import logging
 from scipy.stats import skew
 from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
-from code.EDA.bodyfat_eda import *
+from code.EDA.EDA import *
 from code.utility.data_loader import load_data
 
 logging.basicConfig(level=logging.INFO)
@@ -166,3 +165,9 @@ if __name__ == "__main__":
     data_3 = transform_features(data_2)
     data_4 = drop_highly_correlated_features(data_3)
     data_5 = final_robust_scaling(data_4)
+
+    descriptive_statistics(data_5, 'post_preprocessing', 'statistics', 'pp_descriptive_statistics.csv')
+    distribution(data_5, 'post_preprocessing', 'statistics', 'pp_skewness_values.csv')
+    outlier_detection(data_5, 'post_preprocessing', 'statistics', 'pp_outlier_count.csv')
+    corr_matrix(data_5, 'post_preprocessing', 'statistics', 'pp_correlation_with_bodyfat')
+    visualize_relationships(data_5)
