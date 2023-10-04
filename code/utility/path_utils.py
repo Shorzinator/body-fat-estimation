@@ -15,6 +15,12 @@ def get_path_from_root(*subdirs):
     str: Full path from the root directory
     """
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    # Check if directory exists and if not, create it
+    dir_name = os.path.dirname(os.path.join(root_dir, *subdirs))
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+
     return os.path.join(root_dir, *subdirs)
 
 
