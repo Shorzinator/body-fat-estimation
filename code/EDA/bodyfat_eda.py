@@ -24,19 +24,21 @@ def distribution(data):
             plt.title(f'Distribution of {column}')
             plt.savefig(os.path.join(get_path_from_root('results/EDA/distribution_visualization'),
                                      f'{column}_distribution.png'), dpi=500, bbox_inches='tight')
+            plt.close()
 
             skewness_values = data.skew()
-            skewness_values.to_csv()
+            skewness_values.to_csv(os.path.join(get_path_from_root('results/EDA/statistics'), 'skewness_values.csv'))
 
 
 # 3. Outlier Detection
-def outlier_detection():
+def outlier_detection(data):
     for column in data.columns:
         plt.figure(figsize=(10, 5))
         sns.boxplot(x=data[column])
         plt.title(f'Boxplot of {column}')
         plt.savefig(os.path.join(get_path_from_root('results/EDA/boxplot_outliers'),
                                  f'{column}_outlier.png'), dpi=500, bbox_inches='tight')
+        plt.close()
 
     Q1 = data.quantile(0.25)
     Q3 = data.quantile(0.75)
@@ -46,17 +48,23 @@ def outlier_detection():
 
 
 # 4. Correlation analysis
-def corr_matrix():
+def corr_matrix(data):
     correlation_matrix = data.corr()
     plt.figure(figsize=(10, 5))
     sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
     plt.title('Correlation Matrix')
-    plt.savefig(os.path.join(get_path_from_root('results/EDA/correlation_matrix'),
-                             'correlation_matrix.png'), dpi=1000, bbox_inches='tight')
+    plt.savefig(os.path.join(
+        get_path_from_root('results/EDA/correlation_matrix'), 'correlation_matrix.png'), dpi=1000, bbox_inches='tight')
+    correlation_matrix.to_csv(
+        os.path.join(get_path_from_root('results/EDA/statistics'), 'correlation_matrix.csv')
+    )
 
-    correlation_matrix.to_csv(os.path.join(get_path_from_root('results/EDA/statistics'), 'correlation_matrix.csv'))
-
-    return correlation_matrix
+    # Saving correlation with the target variable
+    correlation_with_bodyfat = data.corr()['BODYFAT'].drop('BODYFAT', axis=0)
+    correlation_with_bodyfat.to_csv(
+        os.path.join(get_path_from_root('results/EDA/statistics'), 'correlation_with_bodyfat.csv')
+    )
+    plt.close()
 
 
 # 5. Visualize relationships
@@ -65,12 +73,23 @@ def visualize_relationships(data):
     correlation_with_bodyfat = data.corr()['BODYFAT'].drop('BODYFAT', axis=0)
     most_correlated_features = correlation_with_bodyfat[correlation_with_bodyfat.abs() > threshold].index.tolist()
 
+    sns.set_style('whitegrid')
+
     for feature in most_correlated_features:
-        plt.scatter(data[feature], data['BODYFAT'])
-        plt.xlabel(feature)
-        plt.ylabel('BODYFAT')
+        plt.figure(figsize=(10, 6))
+
+        # Using seaborn's regplot to plot scatter with a regression line
+        sns.regplot(x=data[feature], y=data['BODYFAT'], scatter_kws={'s': 30, 'alpha': 0.7}, line_kws={'color': 'red'})
+
+        # Title and labels
+        plt.title(f'Relationship between {feature} and BODYFAT', fontsize=15)
+        plt.xlabel(feature, fontsize=12)
+        plt.ylabel('BODYFAT', fontsize=12)
+
+        # Save the plot
         plt.savefig(os.path.join(get_path_from_root('results/EDA/visualize_relationships',
-                                                    f'{feature}_x_BODYFAT.png')), dpi=1000, bbox_inches='tight')
+                                                    f'{feature}_x_BODYFAT.png')), dpi=500, bbox_inches='tight')
+        plt.close()
 
 
 def kde_plots(data):
@@ -81,16 +100,15 @@ def kde_plots(data):
             plt.title(f'KDE of {column}')
             plt.savefig(os.path.join(get_path_from_root('results/EDA/KDE',
                                                         f'{column}_KDE.png')), dpi=200, bbox_inches='tight')
+            plt.close()
 
 
 if __name__ == "__main__":
     # Load the data
     data = load_data()
-    """
     descriptive_statistics(data)
     distribution(data)
     outlier_detection(data)
     corr_matrix(data)
     visualize_relationships(data)
-    """
-    kde_plots(data)
+    # kde_plots(data)
