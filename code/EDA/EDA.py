@@ -1,6 +1,6 @@
-import os
 import logging
-import pandas as pd
+import os.path
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -24,8 +24,14 @@ def save_results(data, operation, result_type, filename):
     :param subdir: Subdirectory under the result_type directory
     """
 
-    logger.info(f"Saving {filename}...\n")
     save_path = get_path_from_root('results', operation, result_type, filename)
+
+    # Check if directory exists and if not, create it
+    dir_name = os.path.dirname(save_path)
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+
+    logger.info(f"Saving {filename} to {save_path}.\n")
     data.to_csv(save_path)
 
 
@@ -90,7 +96,7 @@ def corr_matrix(data, operation, result_type, filename):
 
     # Saving correlation with the target variable
     correlation_with_bodyfat = data.corr()['BODYFAT'].drop('BODYFAT', axis=0)
-    save_results(correlation_with_bodyfat, operation, result_type, filename+'.csv')
+    save_results(correlation_with_bodyfat, operation, result_type, filename + '.csv')
     plt.close()
 
 
@@ -140,7 +146,7 @@ def kde_plots(data):
 if __name__ == "__main__":
     # Load the data
     data = load_data()
-    # descriptive_statistics(data, 'EDA', 'statistics', 'descriptive_statistics.csv')
+    descriptive_statistics(data, 'EDA', 'statistics', 'descriptive_statistics.csv')
     # distribution(data, 'EDA', 'statistics', 'skewness_values.csv')
     # outlier_detection(data, 'EDA', 'statistics', 'outlier_count.csv')
     # corr_matrix(data, 'EDA', 'statistics', 'correlation_with_bodyfat')
