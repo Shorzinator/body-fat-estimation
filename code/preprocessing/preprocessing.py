@@ -1,6 +1,15 @@
+import numpy as np
 import pandas as pd
+import logging
+from scipy.stats import skew
 from sklearn.impute import KNNImputer, SimpleImputer
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler, StandardScaler
+
+from code.EDA.bodyfat_eda import *
+from code.utility.data_loader import load_data
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def scale_data(data):
@@ -11,30 +20,27 @@ def scale_data(data):
     """
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(data)
-    return pd.DataFrame(scaled_data, columns=data.columns)
+    return pd.DataFrame(scaled_data, columns=data.columns), scaler
 
 
-def knn_imputation(data, n_neighbors=5, scaled=True):
+def knn_imputation(data, n_neighbors=5):
     """
     Imputes missing values using KNN imputation.
 
-    :param scaled: Is the input data scaled or not?
     :param data: Input data
     :param n_neighbors: Parameter for KNNImputer
     :return: Data with imputed values
     """
-    # KNNImputer is sensitive to scale
-    scaler = StandardScaler()
 
-    if not scaled:
-        scaled_data = scaler.fit_transform(data)
-        scaled = True
+    # Scaling since KNNImputer is sensitive to the scale of the data.
+    scaled_data, scaler = scale_data(data)
 
+    # Applying the KNNImputer to the data
     imputer = KNNImputer(n_neighbors=n_neighbors)
-    imputed_data = imputer.fit_transform(data)
+    imputed_data = imputer.fit_transform(scaled_data)
 
-    if scaled:
-        data = scaler.inverse_transform(imputed_data)
+    # Inverting the scaling to ensure subsequent steps aren't applied to unnaturally scaled data
+    data = scaler.inverse_transform(imputed_data)
 
     return pd.DataFrame(data, columns=data.columns)
 
@@ -52,5 +58,111 @@ def mean_imputation(data):
     return pd.DataFrame(imputed_data, columns=data.columns)
 
 
+def transform_features(data):
+    """
+    Apply transformation to features with skewness.
+
+    :param data: Input data.
+    :return: Data with transformed features.
+    """
+
+    # Check for skewness in each feature
+    skewed_feats = data.apply(lambda x: skew(x.dropna()))
+    skewed_feats = skewed_feats[skewed_feats > 0.75]
+
+    # Apply log transformation
+    for feat in skewed_feats.index:
+        data[feat] = np.log1p(data[feat])
+
+    return data
+
+
+def handle_outliers(data, factor=1.5):
+    """
+    Handle outliers using the IQR range.
+
+    :param data: Input data
+    :param factor:  Factor for IQR range
+    :return: Data with outliers handled
+    """
+
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+
+    # Cap the data
+    clipped_data = data.clip(lower_bound, upper_bound, axis=1)
+
+    return clipped_data
+
+
+def drop_highly_correlated_features(data, threshold=0.9):
+    """
+    Drop features that have multicollinearity higher than the threshold.
+
+    :param data: Input Data
+    :param threshold: Correlation threshold
+    :return: Data with less correlated features
+    """
+
+    corr_matrix = data.corr().abs()
+    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
+
+    to_drop = [column for column in upper.columns if any(upper[column] > threshold)]
+    data.drop(columns=to_drop, inplace=True)
+
+    logging.info()
+
+    return data
+
+
+def final_robust_scaling(data, robust=True):
+    """
+    Apply final scaling to the data
+
+    :param robust: Use RobustScale if True, otherwise StandardScaler
+    :param data: Input data
+    :return: Robust Scaled data
+    """
+    if robust:
+        scaler = RobustScaler()
+    else:
+        scaler = StandardScaler()
+
+    scaled_data = scaler.fit_transform(data)
+
+    return pd.DataFrame(scaled_data, columns=data.columns)
+
+
+def preprocessing_checks(data):
+    """
+    Run EDA functions to check the integrity of preprocessed data.
+
+    :param data: Preprocessed input data
+    :return: None
+    """
+    print("Running descriptive statistics...")
+    descriptive_statistics(data)
+    print("Checking data distributions...")
+    distribution(data)
+    print("Detecting outliers post preprocessing...")
+    outlier_detection(data)
+    print("Checking correlation matrix...")
+    corr_matrix(data)
+    print("Visualizing relationships with the target variable...")
+    visualize_relationships(data)
+
+
 if __name__ == "__main__":
-    pass
+    df = load_data()
+
+    # Dropping IDNO
+    df.drop(columns=['IDNO'], inplace=True)
+
+    data_1 = handle_outliers(df)
+    data_2 = knn_imputation(data_1)
+    data_3 = transform_features(data_2)
+    data_4 = drop_highly_correlated_features(data_3)
+    data_5 = final_robust_scaling(data_4)
