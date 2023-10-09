@@ -1,0 +1,265 @@
+---
+title: "R Notebook"
+output: pdf_document
+---
+```{r}
+data <- read.csv('BodyFat.csv')
+
+```
+
+```{r}
+library(dplyr)
+
+data <- data %>%
+  mutate(`WEIGHT` = `WEIGHT` * 0.453592)
+
+data <- data %>%
+  mutate(`HEIGHT` = `HEIGHT` * 2.54)
+
+```
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+p <- ggplot(data = gather(data), aes(x = key, y = value)) +
+  geom_boxplot() +
+  xlab("Predictor") +
+  ylab("Value") +
+  ggtitle("Boxplot of Predictors") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+#ggsave("boxplot_all.png", plot = p, width = 10, height = 6, dpi = 300)
+
+```
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+for (predictor in colnames(data)) {
+  df <- data %>%
+    select(all_of(predictor))
+  
+  b <- ggplot(df, aes(x = 1, y = !!sym(predictor))) +
+    geom_boxplot() +
+    xlab("") +
+    ylab(predictor) +
+    ggtitle(paste("Boxplot of", predictor))
+  
+  #ggsave(paste("boxplot_", predictor, ".png", sep = ""), plot = b, width = 6, height = 4, dpi = 300)
+}
+
+```
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+numeric_cols <- data %>%
+  select_if(is.numeric)
+
+long_data <- numeric_cols %>%
+  gather(key = "Column", value = "Value")
+
+q <- ggplot(long_data, aes(sample = Value)) +
+  geom_qq() +
+  stat_qq_line() +
+  facet_wrap(~ Column, scales = "free") +
+  labs(title = "QQ Plots of all the Non-numeric Columns")
+
+#ggsave("qqplot_all.png", plot = q, width = 10, height = 6, dpi = 300)
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+for (predictor in colnames(data)) {
+  q2 <- ggplot(data, aes(sample = .data[[predictor]])) +
+    geom_qq() +
+    stat_qq_line() +
+    labs(title = paste("QQ Plot of", predictor))
+
+  #ggsave(paste("qqplot_", predictor, ".png", sep = ""), plot = q2, width = 6, height = 4, dpi = 300)
+}
+
+```
+
+
+```{r}
+acceptable_ranges <- list(
+  BODYFAT = c(6, 30),
+  DENSITY = c(0.995, 1.109),
+  AGE = c(22, 81),
+  WEIGHT = c(48, 108),
+  HEIGHT = c(160, 198),
+  ADIPOSITY = c(18, 40),
+  NECK = c(30, 52),
+  CHEST = c(79, 136),
+  HIP = c(85, 147),
+  THIGH = c(47, 87),
+  KNEE = c(33, 49),
+  BICEPS = c(24, 45),
+  FOREARM = c(21, 35),
+  WRIST = c(15, 22)
+)
+```
+
+TRUE indicates that the data point is an outlier.
+```{r}
+outliers_df <- data.frame(IDNO = data$IDNO)
+
+for (col_name in names(acceptable_ranges)) {
+  col_data <- data[[col_name]]
+  col_range <- acceptable_ranges[[col_name]]
+  
+  outlier_flag <- col_data < col_range[1] | col_data > col_range[2]
+  
+  outliers_df[col_name] <- outlier_flag
+}
+write.csv(outliers_df, "outliers.csv", row.names = FALSE)
+```
+
+Handling outliers using regression imputation: Not the right choice!
+
+```{r}
+# library(dplyr)
+# 
+# impute_outliers_regression <- function(data, column_name, acceptable_range) {
+#   data_copy <- data
+#   
+#   outliers <- data_copy[[column_name]] < acceptable_range[1] | data_copy[[column_name]] > acceptable_range[2]
+# 
+#   data_copy[outliers, column_name] <- NA
+#   
+#   lm_model <- lm(data_copy[[column_name]] ~ ., data = data_copy %>% select(-all_of(column_name)))
+# 
+#   predicted_values <- predict(lm_model, newdata = data_copy %>% filter(is.na(data_copy[[column_name]])))
+#   
+#   data_copy[is.na(data_copy[[column_name]]), column_name] <- predicted_values
+#   
+#   return(data_copy)
+# }
+# 
+# for (col_name in names(acceptable_ranges)) {
+#   data <- impute_outliers_regression(data, col_name, acceptable_ranges[[col_name]])
+# }
+# 
+# summary(data)
+```
+
+```{r}
+outliers_df <- read.csv("outliers.csv")
+
+outliers_df <- outliers_df[, -1]
+
+outlier_counts <- colSums(outliers_df)
+
+print(outlier_counts)
+```
+
+```{r}
+winsorize <- function(x, lower_limit, upper_limit) {
+  x[x < lower_limit] <- lower_limit
+  x[x > upper_limit] <- upper_limit
+  return(x)
+}
+
+for (col_name in names(acceptable_ranges)) {
+  col_data <- data[[col_name]]
+  col_range <- acceptable_ranges[[col_name]]
+  
+  lower_limit <- col_range[1]
+  upper_limit <- col_range[2]
+  
+  outlier_flag <- col_data < lower_limit | col_data > upper_limit
+  data[[col_name]] <- winsorize(col_data, lower_limit, upper_limit)
+}
+
+write.csv(data, "winsorized_data.csv", row.names = FALSE)
+```
+
+
+```{r}
+winsorized_data <- read.csv("winsorized_data.csv")
+
+summary(winsorized_data)
+```
+
+
+Regression Model
+```{r}
+model_data <- read.csv('winsorized_data.csv') 
+```
+
+```{r}
+library(dplyr)
+set.seed(123) 
+sample_index <- sample(1:nrow(model_data), 0.7 * nrow(model_data))
+train_data <- model_data[sample_index, ]
+test_data <- model_data[-sample_index, ]
+
+
+formula <- BODYFAT ~ . - IDNO  # Exclude 
+
+lm_model <- lm(formula, data = train_data)
+
+test_predictions <- predict(lm_model, newdata = test_data)
+
+```
+
+
+```{r}
+rmse <- sqrt(mean((test_data$BODYFAT - test_predictions)^2))
+
+r_squared <- 1 - (sum((test_data$BODYFAT - test_predictions)^2) / sum((test_data$BODYFAT - mean(test_data$BODYFAT))^2))
+
+cat("RMSE:", rmse, "\n")
+cat("R-squared:", r_squared, "\n")
+
+```
+```{r}
+summary(lm_model)
+```
+
+From the summary, the predictors with lowest p-values are considered the most statistically significant. 
+
+In this case, DENSITY and WEIGHT are highly significant, followed by HEIGHT, ADIPOSITY, and AGE. The predictors with higher p-values, such as ABDOMEN, HIP, THIGH, KNEE, ANKLE, CHEST, NECK, FOREARM, BICEPS, and WRIST, are considered less statistically significant in this model.
+
+Robust Regression Model
+
+```{r}
+library(MASS)
+
+M_data <- read.csv("winsorized_data.csv")
+sample_index <- sample(1:nrow(model_data), 0.7 * nrow(model_data))
+train_data <- model_data[sample_index, ]
+test_data <- model_data[-sample_index, ]
+
+formula <- BODYFAT ~ WEIGHT + HEIGHT + AGE + NECK + CHEST + ABDOMEN + HIP + THIGH + KNEE + ANKLE + BICEPS + FOREARM + WRIST
+
+robust_model <- rlm(formula, data = M_data)
+```
+
+```{r}
+summary(robust_model)
+```
+
+```{r}
+test_predictions <- predict(robust_model, newdata = test_data)
+
+rmse <- sqrt(mean((test_data$BODYFAT - test_predictions)^2))
+
+r_squared <- 1 - (sum((test_data$BODYFAT - test_predictions)^2) / sum((test_data$BODYFAT - mean(test_data$BODYFAT))^2))
+
+cat("RMSE:", rmse, "\n")
+cat("R-squared:", r_squared, "\n")
+```
+
