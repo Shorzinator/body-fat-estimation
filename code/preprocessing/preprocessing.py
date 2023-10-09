@@ -3,12 +3,39 @@ import pandas as pd
 from scipy.stats import skew
 from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.preprocessing import RobustScaler, StandardScaler
-
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 from code.EDA.EDA import *
 from code.utility.data_loader import load_data
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def calculate_bmi(data):
+    """
+    Calculate BMI using weight and height.
+    Convert weight from lbs to kg and height from inches to meters for calculation.
+    :param data: Input data.
+    :return: Data with added BMI column and dropping ADIPOSITY.
+    """
+    data['BMI'] = (data['ADIPOSITY'] + (data['WEIGHT'] * 0.453592) / ((data['HEIGHT'] * 0.0254)**2)) / 2
+    data.drop('ADIPOSITY', axis=1, inplace=True)
+    return data
+
+
+def check_vif(data, threshold=10):
+    """
+    Check Variance Inflation Factor (VIF) and drop features with VIF above threshold.
+    :param data: Input data.
+    :param threshold: VIF Threshold.
+    :return: Data without high VIF features.
+    """
+
+    features = data.columns
+    vif_data = [variance_inflation_factor(data.values, i) for i in range(data.shape[1])]
+    vif_df = pd.DataFrame({'Feature': features, 'VIF': vif_data})
+    features_to_drop = vif_df[vif_df['VIF'] > threshold]['Feature'].tolist()
+    return data.drop(columns=features_to_drop, inplace=True)
 
 
 def scale_data(data):
