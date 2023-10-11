@@ -9,6 +9,45 @@ from code.utility.data_loader import load_data
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+pd.set_option('display.max_columns', None)
+
+
+def handle_anomalies(data):
+    """
+    Handle simple and intricate anomalies in the data.
+
+    :param data: Input data
+    :return: Data with no impossible values.
+    """
+    # Simple Anomalies
+    data = data[data['BODYFAT'] >= 2]
+    data = data[data['HEIGHT'] >= 54]  # 4.5 ft
+    data = data[data['HEIGHT'] <= 84]  # 7 ft
+    data = data[data['AGE'] >= 18]  # Adult age
+    data = data[data['AGE'] <= 90]  # Reasonable upper limit for dataset
+
+    # Intricate Anomalies
+    # Height and Weight Relationship
+    data = data[~((data['HEIGHT'] <= 60) & (data['WEIGHT'] > 250))]  # 5 ft tall and weighing above 250 lbs
+    data = data[~((data['HEIGHT'] >= 72) & (data['WEIGHT'] < 100))]  # 6 ft tall and weighing less than 100 lbs
+
+    # Age and Body Fat
+    data = data[~((data['AGE'] <= 25) & (data['BODYFAT'] > 35))]
+    data = data[~((data['AGE'] >= 70) & (data['BODYFAT'] < 5))]
+
+    # Anthropometric Measurements
+    data = data[data['WRIST'] < data['NECK']]
+    data = data[data['THIGH'] > data['FOREARM']]
+
+    # Body Fat and Anthropometric Measurements
+    condition_1 = data['BODYFAT'] < 2
+    condition_2 = data['HIP'] > 40
+    data = data[~(condition_1 & condition_2)]
+
+    # Height and Anthropometric Measurements
+    data = data[~((data['HEIGHT'] >= 84) & (data['WRIST'] < 6))]
+
+    return data
 
 
 def calculate_bmi(data):
@@ -163,24 +202,44 @@ def preprocessing_checks(data):
 
 
 def main_preprocessing(data):
-    return (data
-            .drop(columns=['IDNO', 'DENSITY'])
-            .pipe(calculate_bmi)
-            .pipe(handle_outliers)
-            .pipe(knn_imputation)
-            .pipe(transform_features)
-            .pipe(drop_highly_correlated_features)
-            .pipe(final_robust_scaling))
+    data = data.drop(columns=['IDNO', 'DENSITY'])
+
+    data = handle_anomalies(data)
+    logger.info(f"After handle_anomalies: {(data == 0).sum().sum()} zeros present.")
+
+    data = calculate_bmi(data)
+    logger.info(f"After calculate_bmi: {(data == 0).sum().sum()} zeros present.")
+
+    data = handle_outliers(data)
+    logger.info(f"After handle_outliers: {(data == 0).sum().sum()} zeros present.")
+
+    data = knn_imputation(data)
+    logger.info(f"After knn_imputation: {(data == 0).sum().sum()} zeros present.")
+
+    data = transform_features(data)
+    logger.info(f"After transform_features: {(data == 0).sum().sum()} zeros present.")
+
+    data = drop_highly_correlated_features(data)
+    logger.info(f"After drop_highly_correlated_features: {(data == 0).sum().sum()} zeros present.")
+
+    logger.info(data.describe())
+
+    data = final_robust_scaling(data)
+    logger.info(f"After final_robust_scaling: {(data == 0).sum().sum()} zeros present.")
+
+    return data
 
 
 if __name__ == "__main__":
     df = load_data()
     preprocessed_data = main_preprocessing(df)
-    preprocessed_data.to_csv(os.path.join(get_path_from_root('data', 'preprocessed'), 'preprocessed_data.csv'))
-    # descriptive_statistics(preprocessed_data, 'descriptive_statistics.csv', 'statistics',
-    #                        'pp_descriptive_statistics.csv')
-    # distribution(preprocessed_data, 'post_processing', 'pp_skewness_values')
-    # outlier_detection(preprocessed_data, 'post_processing', 'pp_outlier_count')
-    # corr_matrix(preprocessed_data, 'post_preprocessing', 'statistics', 'pp_correlation_with_bodyfat.csv')
-    # visualize_relationships(preprocessed_data)
-    # qq_plots(preprocessed_data, 'post_processing')
+    """
+    preprocessed_data.to_csv(os.path.join(get_path_from_root('data', 'preprocessed'), 'preprocessed_data.csv'), header=False)
+    descriptive_statistics(preprocessed_data, 'descriptive_statistics.csv', 'statistics',
+                           'pp_descriptive_statistics.csv')
+    distribution(preprocessed_data, 'post_processing', 'pp_skewness_values')
+    outlier_detection(preprocessed_data, 'post_processing', 'pp_outlier_count')
+    corr_matrix(preprocessed_data, 'post_preprocessing', 'statistics', 'pp_correlation_with_bodyfat.csv')
+    visualize_relationships(preprocessed_data)
+    qq_plots(preprocessed_data, 'post_processing')
+    """
