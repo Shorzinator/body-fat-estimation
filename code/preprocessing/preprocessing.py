@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import skew
-from sklearn.impute import KNNImputer, SimpleImputer
+from sklearn.impute import KNNImputer
 from sklearn.preprocessing import RobustScaler, StandardScaler
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from code.EDA.EDA import *
@@ -25,7 +25,7 @@ def calculate_bmi(data):
 
 def check_vif(data, threshold=10):
     """
-    Check Variance Inflation Factor (VIF) and drop features with VIF above threshold.
+    Check Variance Inflation Factor (VIF) and drop features with VIF above the threshold.
     :param data: Input data.
     :param threshold: VIF Threshold.
     :return: Data without high VIF features.
@@ -35,7 +35,8 @@ def check_vif(data, threshold=10):
     vif_data = [variance_inflation_factor(data.values, i) for i in range(data.shape[1])]
     vif_df = pd.DataFrame({'Feature': features, 'VIF': vif_data})
     features_to_drop = vif_df[vif_df['VIF'] > threshold]['Feature'].tolist()
-    return data.drop(columns=features_to_drop, inplace=True)
+    data.drop(columns=features_to_drop, inplace=True)
+    return data
 
 
 def scale_data(data):
@@ -58,6 +59,9 @@ def knn_imputation(data, n_neighbors=5):
     :return: Data with imputed values
     """
 
+    # Retain column names
+    column_names = data.columns
+
     # Scaling since KNNImputer is sensitive to the scale of the data.
     scaled_data, scaler = scale_data(data)
 
@@ -66,22 +70,9 @@ def knn_imputation(data, n_neighbors=5):
     imputed_data = imputer.fit_transform(scaled_data)
 
     # Inverting the scaling to ensure subsequent steps aren't applied to unnaturally scaled data
-    data = scaler.inverse_transform(imputed_data)
+    data_array = scaler.inverse_transform(imputed_data)
 
-    return pd.DataFrame(data, columns=data.columns)
-
-
-def mean_imputation(data):
-    """
-    Imputes missing values using mean imputation.
-
-    :param data: Input data
-    :return: Data imputed using simple imputer
-    """
-    imputer = SimpleImputer(strategy='mean')
-    imputed_data = imputer.fit_transform(data)
-
-    return pd.DataFrame(imputed_data, columns=data.columns)
+    return pd.DataFrame(data_array, columns=column_names)
 
 
 def transform_features(data):
@@ -134,31 +125,21 @@ def drop_highly_correlated_features(data, threshold=0.9):
     """
 
     corr_matrix = data.corr().abs()
-    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
-
+    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool_))
     to_drop = [column for column in upper.columns if any(upper[column] > threshold)]
     data.drop(columns=to_drop, inplace=True)
-
-    logging.info()
-
     return data
 
 
-def final_robust_scaling(data, robust=True):
+def final_robust_scaling(data):
     """
     Apply final scaling to the data
 
-    :param robust: Use RobustScale if True, otherwise StandardScaler
     :param data: Input data
     :return: Robust Scaled data
     """
-    if robust:
-        scaler = RobustScaler()
-    else:
-        scaler = StandardScaler()
-
+    scaler = RobustScaler()
     scaled_data = scaler.fit_transform(data)
-
     return pd.DataFrame(scaled_data, columns=data.columns)
 
 
@@ -181,20 +162,25 @@ def preprocessing_checks(data):
     visualize_relationships(data)
 
 
+def main_preprocessing(data):
+    return (data
+            .drop(columns=['IDNO', 'DENSITY'])
+            .pipe(calculate_bmi)
+            .pipe(handle_outliers)
+            .pipe(knn_imputation)
+            .pipe(transform_features)
+            .pipe(drop_highly_correlated_features)
+            .pipe(final_robust_scaling))
+
+
 if __name__ == "__main__":
     df = load_data()
-
-    # Dropping IDNO
-    df.drop(columns=['IDNO'], inplace=True)
-
-    data_1 = handle_outliers(df)
-    data_2 = knn_imputation(data_1)
-    data_3 = transform_features(data_2)
-    data_4 = drop_highly_correlated_features(data_3)
-    data_5 = final_robust_scaling(data_4)
-
-    descriptive_statistics(data_5, 'post_preprocessing', 'statistics', 'pp_descriptive_statistics.csv')
-    distribution(data_5, 'post_preprocessing', 'statistics', 'pp_skewness_values.csv')
-    outlier_detection(data_5, 'post_preprocessing', 'statistics', 'pp_outlier_count.csv')
-    corr_matrix(data_5, 'post_preprocessing', 'statistics', 'pp_correlation_with_bodyfat')
-    visualize_relationships(data_5)
+    preprocessed_data = main_preprocessing(df)
+    preprocessed_data.to_csv(os.path.join(get_path_from_root('data', 'preprocessed'), 'preprocessed_data.csv'))
+    # descriptive_statistics(preprocessed_data, 'descriptive_statistics.csv', 'statistics',
+    #                        'pp_descriptive_statistics.csv')
+    # distribution(preprocessed_data, 'post_processing', 'pp_skewness_values')
+    # outlier_detection(preprocessed_data, 'post_processing', 'pp_outlier_count')
+    # corr_matrix(preprocessed_data, 'post_preprocessing', 'statistics', 'pp_correlation_with_bodyfat.csv')
+    # visualize_relationships(preprocessed_data)
+    # qq_plots(preprocessed_data, 'post_processing')
