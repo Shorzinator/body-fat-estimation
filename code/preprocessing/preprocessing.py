@@ -191,28 +191,19 @@ def main_preprocessing(data, use_rfm=True):
     data = data.drop(columns=['IDNO', 'DENSITY'])
 
     data = handle_anomalies(data)
-    logger.info(f"After handle_anomalies: {(data == 0).sum().sum()} zeros present.")
 
-    if use_rfm:
-        data = compute_rfm(data)
-        # Dropping HEIGHT, WEIGHT, AGE, and ABDOMEN when using RFM
-        data = data.drop(columns=['HEIGHT', 'WEIGHT', 'AGE'])
-    else:
-        data = calculate_bmi(data)
-        # Dropping HEIGHT and WEIGHT when using BMI
-        data = data.drop(columns=['HEIGHT', 'WEIGHT'])
+    data = calculate_bmi(data)
+
+    # Dropping HEIGHT and WEIGHT when using BMI
+    data = data.drop(columns=['HEIGHT', 'WEIGHT'])
 
     data = handle_outliers(data)
-    logger.info(f"After handle_outliers: {(data == 0).sum().sum()} zeros present.")
 
     data = knn_imputation(data)
-    logger.info(f"After knn_imputation: {(data == 0).sum().sum()} zeros present.")
 
     data = transform_features(data)
-    logger.info(f"After transform_features: {(data == 0).sum().sum()} zeros present.")
 
-    # data = final_robust_scaling(data)
-    # logger.info(f"After final_robust_scaling: {(data == 0).sum().sum()} zeros present.")
+    data = final_robust_scaling(data)
 
     return data
 
@@ -220,17 +211,10 @@ def main_preprocessing(data, use_rfm=True):
 if __name__ == "__main__":
     df = load_data()
 
-    # Preprocessing for the RFM case
-    use_rfm = False
-    if use_rfm:
-        preprocessed_data_rfm = main_preprocessing(df, use_rfm=use_rfm)
-        preprocessed_data_rfm.to_csv(os.path.join(get_path_from_root('data', 'preprocessed'), 'preprocessed_data_rfm.csv'),
-                                     index=False)
-    else:
-        # Preprocessing for BMI case
-        preprocessed_data_bmi = main_preprocessing(df, use_rfm=use_rfm)
-        preprocessed_data_bmi.to_csv(os.path.join(get_path_from_root('data', 'preprocessed'), 'preprocessed_data_bmi.csv'),
-                                     index=False)
+    # Preprocessing for the BMI case
+    preprocessed_data_bmi = main_preprocessing(df)
+    preprocessed_data_bmi.to_csv(os.path.join(get_path_from_root('data', 'preprocessed'), 'preprocessed_data.csv'),
+                                 index=False)
 
     """
     descriptive_statistics(preprocessed_data, 'descriptive_statistics.csv', 'statistics',
