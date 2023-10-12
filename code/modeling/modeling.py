@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.model_selection import GridSearchCV, cross_val_score, KFold, train_test_split
+from sklearn.svm import SVR
 
 from code.utility.path_utils import get_path_from_root
 
@@ -143,7 +144,31 @@ def main(use_bootstrap=True):
     logging.info(f"Top Predictors (RidReg): {top_predictors(ridge, X.columns)[:3]}")
 
     end_time_RidReg = time.time()
-    logging.info(f"Elapsed time for RidReg: {(end_time_RidReg - start_time_RidReg):.2f} seconds")
+    logging.info(f"Elapsed time for RidReg: {(end_time_RidReg - start_time_RidReg):.2f} seconds\n")
+
+    start_time_SVR = time.time()
+
+    params_svr = {
+        'C': [0.5],
+        'gamma': ['auto'],
+        'kernel': ['rbf'],
+        'degree': [2]  # only used when kernel is 'poly'
+    }
+    best_params_svr = hyperparameter_tuning(SVR(), params_svr, X, y)
+    svr = SVR(**best_params_svr)
+
+    if use_bootstrap:
+        mse_scores, r2_scores = bootstrap_evaluation(svr, X, y)
+        logging.info(f"SVR - RMSE (Bootstrap): {np.mean(np.sqrt(mse_scores))} +/- {np.std(np.sqrt(mse_scores))}")
+        logging.info(f"SVR - R^2 (Bootstrap): {np.mean(r2_scores)} +/- {np.std(r2_scores)}")
+    else:
+        evaluate_model(svr, X, y, n_split=splits, model_name="Support Vector Regression")
+        svr.fit(X, y)
+
+    plot_residuals(svr, X, y, "Support Vector Regression")
+
+    end_time_SVR = time.time()
+    logging.info(f"Elapsed time for SVR: {(end_time_SVR - start_time_SVR):.2f} seconds\n")
 
 
 if __name__ == "__main__":
