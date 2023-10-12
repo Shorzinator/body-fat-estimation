@@ -21,15 +21,8 @@ def handle_anomalies(data):
     """
     # Simple Anomalies
     data = data[data['BODYFAT'] >= 2]
-    data = data[data['HEIGHT'] >= 54]  # 4.5 ft
-    data = data[data['HEIGHT'] <= 84]  # 7 ft
     data = data[data['AGE'] >= 18]  # Adult age
     data = data[data['AGE'] <= 90]  # Reasonable upper limit for dataset
-
-    # Intricate Anomalies
-    # Height and Weight Relationship
-    data = data[~((data['HEIGHT'] <= 60) & (data['WEIGHT'] > 250))]  # 5 ft tall and weighing above 250 lbs
-    data = data[~((data['HEIGHT'] >= 72) & (data['WEIGHT'] < 100))]  # 6 ft tall and weighing less than 100 lbs
 
     # Age and Body Fat
     data = data[~((data['AGE'] <= 25) & (data['BODYFAT'] > 35))]
@@ -44,9 +37,6 @@ def handle_anomalies(data):
     condition_2 = data['HIP'] > 40
     data = data[~(condition_1 & condition_2)]
 
-    # Height and Anthropometric Measurements
-    data = data[~((data['HEIGHT'] >= 84) & (data['WRIST'] < 6))]
-
     return data
 
 
@@ -57,12 +47,12 @@ def calculate_bmi(data):
     :param data: Input data.
     :return: Data with added BMI column and dropping ADIPOSITY.
     """
-    data['BMI'] = (data['ADIPOSITY'] + (data['WEIGHT'] * 0.453592) / ((data['HEIGHT'] * 0.0254)**2)) / 2
+    data['BMI'] = (data['ADIPOSITY'] + (data['WEIGHT'] * 0.453592) / ((data['HEIGHT'] * 0.0254) ** 2)) / 2
     data.drop('ADIPOSITY', axis=1, inplace=True)
     return data
 
 
-def check_vif(data, threshold=10):
+def check_vif(data, threshold=15):
     """
     Check Variance Inflation Factor (VIF) and drop features with VIF above the threshold.
     :param data: Input data.
@@ -73,7 +63,9 @@ def check_vif(data, threshold=10):
     features = data.columns
     vif_data = [variance_inflation_factor(data.values, i) for i in range(data.shape[1])]
     vif_df = pd.DataFrame({'Feature': features, 'VIF': vif_data})
+    logging.info(f"VIF values: {vif_df}")
     features_to_drop = vif_df[vif_df['VIF'] > threshold]['Feature'].tolist()
+    logging.info(f"Features being dropped for having a high VIF: {features_to_drop}")
     data.drop(columns=features_to_drop, inplace=True)
     return data
 
@@ -154,22 +146,6 @@ def handle_outliers(data, factor=1.5):
     return clipped_data
 
 
-def drop_highly_correlated_features(data, threshold=0.9):
-    """
-    Drop features that have multicollinearity higher than the threshold.
-
-    :param data: Input Data
-    :param threshold: Correlation threshold
-    :return: Data with less correlated features
-    """
-
-    corr_matrix = data.corr().abs()
-    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool_))
-    to_drop = [column for column in upper.columns if any(upper[column] > threshold)]
-    data.drop(columns=to_drop, inplace=True)
-    return data
-
-
 def final_robust_scaling(data):
     """
     Apply final scaling to the data
@@ -201,14 +177,30 @@ def preprocessing_checks(data):
     visualize_relationships(data)
 
 
-def main_preprocessing(data):
+def compute_rfm(data):
+    """
+    Compute Relative Fat Mass (RFM) for men.
+    :param data: Input data.
+    :return: Data with added RFM column.
+    """
+    data['RFM'] = 64 - (20 * (data['HEIGHT'] / data['ABDOMEN'])) + (12 * data['AGE'])
+    return data
+
+
+def main_preprocessing(data, use_rfm=True):
     data = data.drop(columns=['IDNO', 'DENSITY'])
 
     data = handle_anomalies(data)
     logger.info(f"After handle_anomalies: {(data == 0).sum().sum()} zeros present.")
 
-    data = calculate_bmi(data)
-    logger.info(f"After calculate_bmi: {(data == 0).sum().sum()} zeros present.")
+    if use_rfm:
+        data = compute_rfm(data)
+        # Dropping HEIGHT, WEIGHT, AGE, and ABDOMEN when using RFM
+        data = data.drop(columns=['HEIGHT', 'WEIGHT', 'AGE'])
+    else:
+        data = calculate_bmi(data)
+        # Dropping HEIGHT and WEIGHT when using BMI
+        data = data.drop(columns=['HEIGHT', 'WEIGHT'])
 
     data = handle_outliers(data)
     logger.info(f"After handle_outliers: {(data == 0).sum().sum()} zeros present.")
@@ -219,22 +211,28 @@ def main_preprocessing(data):
     data = transform_features(data)
     logger.info(f"After transform_features: {(data == 0).sum().sum()} zeros present.")
 
-    data = drop_highly_correlated_features(data)
-    logger.info(f"After drop_highly_correlated_features: {(data == 0).sum().sum()} zeros present.")
-
-    logger.info(data.describe())
-
-    data = final_robust_scaling(data)
-    logger.info(f"After final_robust_scaling: {(data == 0).sum().sum()} zeros present.")
+    # data = final_robust_scaling(data)
+    # logger.info(f"After final_robust_scaling: {(data == 0).sum().sum()} zeros present.")
 
     return data
 
 
 if __name__ == "__main__":
     df = load_data()
-    preprocessed_data = main_preprocessing(df)
+
+    # Preprocessing for the RFM case
+    use_rfm = False
+    if use_rfm:
+        preprocessed_data_rfm = main_preprocessing(df, use_rfm=use_rfm)
+        preprocessed_data_rfm.to_csv(os.path.join(get_path_from_root('data', 'preprocessed'), 'preprocessed_data_rfm.csv'),
+                                     index=False)
+    else:
+        # Preprocessing for BMI case
+        preprocessed_data_bmi = main_preprocessing(df, use_rfm=use_rfm)
+        preprocessed_data_bmi.to_csv(os.path.join(get_path_from_root('data', 'preprocessed'), 'preprocessed_data_bmi.csv'),
+                                     index=False)
+
     """
-    preprocessed_data.to_csv(os.path.join(get_path_from_root('data', 'preprocessed'), 'preprocessed_data.csv'), header=False)
     descriptive_statistics(preprocessed_data, 'descriptive_statistics.csv', 'statistics',
                            'pp_descriptive_statistics.csv')
     distribution(preprocessed_data, 'post_processing', 'pp_skewness_values')
