@@ -1,5 +1,6 @@
 import logging
 import os
+import pickle
 import time
 
 import pandas as pd
@@ -8,7 +9,6 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.model_selection import GridSearchCV, cross_val_score, KFold, train_test_split
-from sklearn.svm import SVR
 
 from code.utility.path_utils import get_path_from_root
 
@@ -59,17 +59,17 @@ def evaluate_model(model, X, y, n_split=10, model_name=""):
     logging.info(f"{model_name} - R^2: {r2_scores.mean()} +/- {r2_scores.std()}\n")
 
 
+"""
 def hyperparameter_tuning(model, params, X, y):
-    """
-    Hyperparameter tuning using GridSearchCV.
-    """
+
     grid_search = GridSearchCV(model, params, cv=10, scoring='neg_mean_squared_error')
     grid_search.fit(X, y)
     best_params = grid_search.best_params_
     return best_params
+"""
 
 
-def bootstrap_evaluation(model, X, y, n_iterations=1000, test_size=0.2):
+def bootstrap_evaluation(model, X, y, n_iterations=1000, test_size=0.25):
     """
     Evaluate model using bootstrap resampling.
     """
@@ -94,6 +94,7 @@ def top_predictors(model, features):
     """
     Return top predictors based on the magnitude of their coefficients.
     """
+    # Check if the model is an instance of RANSACRegressor
     coefficients = model.coef_
     sorted_indices = np.argsort(np.abs(coefficients))[::-1]
     return np.array(features)[sorted_indices]
@@ -105,6 +106,8 @@ def main(use_bootstrap=True):
 
     splits = 5
 
+    """
+    # Linear Regression
     start_time_linreg = time.time()
 
     lin_reg = LinearRegression()
@@ -121,56 +124,34 @@ def main(use_bootstrap=True):
 
     end_time_linreg = time.time()
     logging.info(f"Elapsed time for LinReg: {(end_time_linreg - start_time_linreg):.2f} seconds\n")
+    """
 
+    # Ridge Regression
     start_time_RidReg = time.time()
 
-    params_ridge = {
-        'alpha': np.logspace(-6, 6, 13),
-        'solver': ['auto'],
-        'positive': [False]
-    }
-    best_params_ridge = hyperparameter_tuning(Ridge(), params_ridge, X, y)
-    ridge = Ridge(**best_params_ridge)
+    ridge = Ridge(alpha=0.1, positive=False, solver='auto')
 
     if use_bootstrap:
         mse_scores, r2_scores = bootstrap_evaluation(ridge, X, y)
         logging.info(f"RidReg - RMSE (Bootstrap): {np.mean(np.sqrt(mse_scores))} +/- {np.std(np.sqrt(mse_scores))}")
         logging.info(f"RidReg - R^2 (Bootstrap): {np.mean(r2_scores)} +/- {np.std(r2_scores)}")
+        ridge.fit(X, y)
     else:
         evaluate_model(ridge, X, y, n_split=splits, model_name="Ridge Regression")
         ridge.fit(X, y)
 
+    # Plotting Residuals
     plot_residuals(ridge, X, y, "Ridge Regression")
+
+    # Printing top predictors
     logging.info(f"Top Predictors (RidReg): {top_predictors(ridge, X.columns)[:3]}")
 
     end_time_RidReg = time.time()
     logging.info(f"Elapsed time for RidReg: {(end_time_RidReg - start_time_RidReg):.2f} seconds\n")
 
-    start_time_SVR = time.time()
-
-    params_svr = {
-        'C': [0.5],
-        'gamma': ['auto'],
-        'kernel': ['rbf'],
-        'degree': [2]  # only used when kernel is 'poly'
-    }
-    best_params_svr = hyperparameter_tuning(SVR(), params_svr, X, y)
-    svr = SVR(**best_params_svr)
-
-    if use_bootstrap:
-        mse_scores, r2_scores = bootstrap_evaluation(svr, X, y)
-        logging.info(f"SVR - RMSE (Bootstrap): {np.mean(np.sqrt(mse_scores))} +/- {np.std(np.sqrt(mse_scores))}")
-        logging.info(f"SVR - R^2 (Bootstrap): {np.mean(r2_scores)} +/- {np.std(r2_scores)}")
-    else:
-        evaluate_model(svr, X, y, n_split=splits, model_name="Support Vector Regression")
-        svr.fit(X, y)
-
-    plot_residuals(svr, X, y, "Support Vector Regression")
-
-    end_time_SVR = time.time()
-    logging.info(f"Elapsed time for SVR: {(end_time_SVR - start_time_SVR):.2f} seconds\n")
+    with open(get_path_from_root("code", "models", "ridge_model_kfold.pkl"), "wb") as model_file:
+        pickle.dump(ridge, model_file)
 
 
 if __name__ == "__main__":
-    main(use_bootstrap=True)
-
+    main(use_bootstrap=False)
