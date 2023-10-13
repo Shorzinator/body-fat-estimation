@@ -1,1 +1,1 @@
-from .code.utility import path_utils, data_loader
+from .project_scripts.utility import path_utils, data_loader

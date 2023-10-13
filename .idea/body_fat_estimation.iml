@@ -8,7 +8,7 @@
       <excludeFolder url="file://$MODULE_DIR$/bodyfat_env_windows" />
       <excludeFolder url="file://$MODULE_DIR$/bodyfat_env_windows/Lib" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.11 (body-fat-estimation)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.11 (body_fat_estimation)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>
