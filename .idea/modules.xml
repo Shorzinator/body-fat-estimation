@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/body-fat-estimation.iml" filepath="$PROJECT_DIR$/.idea/body-fat-estimation.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/body_fat_estimation.iml" filepath="$PROJECT_DIR$/.idea/body_fat_estimation.iml" />
     </modules>
   </component>
 </project>
