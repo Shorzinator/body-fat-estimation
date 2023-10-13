@@ -1,3 +1,4 @@
+import joblib
 import numpy as np
 import pandas as pd
 from scipy.stats import skew
@@ -81,10 +82,11 @@ def scale_data(data):
     return pd.DataFrame(scaled_data, columns=data.columns), scaler
 
 
-def knn_imputation(data, n_neighbors=5):
+def knn_imputation(data, n_neighbors=5, save_imputer=True):
     """
     Imputes missing values using KNN imputation.
 
+    :param save_imputer: Whether to save imputer pkl file or not.
     :param data: Input data
     :param n_neighbors: Parameter for KNNImputer
     :return: Data with imputed values
@@ -99,6 +101,9 @@ def knn_imputation(data, n_neighbors=5):
     # Applying the KNNImputer to the data
     imputer = KNNImputer(n_neighbors=n_neighbors)
     imputed_data = imputer.fit_transform(scaled_data)
+
+    if save_imputer:
+        joblib.dump(imputer, 'knn_imputer.pkl')
 
     # Inverting the scaling to ensure subsequent steps aren't applied to unnaturally scaled data
     data_array = scaler.inverse_transform(imputed_data)
@@ -146,15 +151,19 @@ def handle_outliers(data, factor=1.5):
     return clipped_data
 
 
-def final_robust_scaling(data):
+def final_robust_scaling(data, save_scaler=True):
     """
     Apply final scaling to the data
 
+    :param save_scaler: Whether to save the scalar's state
     :param data: Input data
     :return: Robust Scaled data
     """
     scaler = RobustScaler()
     scaled_data = scaler.fit_transform(data)
+    if save_scaler:
+        joblib.dump(scaler,  "robust_scaler.pkl")
+
     return pd.DataFrame(scaled_data, columns=data.columns)
 
 
@@ -175,16 +184,6 @@ def preprocessing_checks(data):
     corr_matrix(data)
     print("Visualizing relationships with the target variable...")
     visualize_relationships(data)
-
-
-def compute_rfm(data):
-    """
-    Compute Relative Fat Mass (RFM) for men.
-    :param data: Input data.
-    :return: Data with added RFM column.
-    """
-    data['RFM'] = 64 - (20 * (data['HEIGHT'] / data['ABDOMEN'])) + (12 * data['AGE'])
-    return data
 
 
 def main_preprocessing(data, use_rfm=True):
