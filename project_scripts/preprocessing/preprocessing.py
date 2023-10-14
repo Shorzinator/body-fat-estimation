@@ -5,7 +5,7 @@ from scipy.stats import skew
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import RobustScaler, StandardScaler
 from statsmodels.stats.outliers_influence import variance_inflation_factor
-from project_scripts.EDA.EDA import *
+from project_scripts.eda.EDA import *
 from project_scripts.utility.data_loader import load_data
 
 logging.basicConfig(level=logging.INFO)

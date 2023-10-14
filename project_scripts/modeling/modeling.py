@@ -101,30 +101,10 @@ def top_predictors(model, features):
 
 
 def main(use_bootstrap=True):
-    bmi_data = pd.read_csv(get_path_from_root("data", "preprocessed", "preprocessed_data.csv"))
-    X, y = bmi_data.drop('BODYFAT', axis=1), bmi_data['BODYFAT']
+    data = pd.read_csv(get_path_from_root("data", "preprocessed", "preprocessed_data.csv"))
+    X, y = data.drop('BODYFAT', axis=1), data['BODYFAT']
 
     splits = 5
-
-    """
-    # Linear Regression
-    start_time_linreg = time.time()
-
-    lin_reg = LinearRegression()
-    if use_bootstrap:
-        mse_scores, r2_scores = bootstrap_evaluation(lin_reg, X, y)
-        logging.info(f"LinReg - RMSE (Bootstrap): {np.mean(np.sqrt(mse_scores))} +/- {np.std(np.sqrt(mse_scores))}")
-        logging.info(f"LinReg - R^2 (Bootstrap): {np.mean(r2_scores)} +/- {np.std(r2_scores)}")
-    else:
-        evaluate_model(lin_reg, X, y, n_split=splits, model_name="Linear Regression")
-        lin_reg.fit(X, y)  # Fit the model to the entire dataset
-
-    plot_residuals(lin_reg, X, y, "Linear Regression")
-    logging.info(f"Top Predictors (LinReg): {top_predictors(lin_reg, X.columns)[:3]}")
-
-    end_time_linreg = time.time()
-    logging.info(f"Elapsed time for LinReg: {(end_time_linreg - start_time_linreg):.2f} seconds\n")
-    """
 
     # Ridge Regression
     start_time_RidReg = time.time()
