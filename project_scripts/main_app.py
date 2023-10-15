@@ -54,7 +54,21 @@ def estimate_missing_features(abdomen, bmi, wrist):
     for feature in features_to_estimate:
         model_path = gpfr("project_scripts", "for_app", f"model_for_{feature}.pkl")
         model = joblib.load(model_path)
-        missing_features[feature] = model.predict(input_data)[0]
+
+        # Start by setting all the missing features to their mean/median or any default value
+        for missing_feature in features_to_estimate:
+            if missing_feature not in input_data.columns:
+                input_data[missing_feature] = [0]  # setting to 0 as a placeholder; it will be replaced soon
+
+        # Update the already predicted features
+        for k, v in missing_features.items():
+            input_data[k] = v
+
+        # Ensure the order of columns matches what the model expects
+        prediction_input = input_data[model.feature_names_in_]
+
+        # Predict the feature and store its value
+        missing_features[feature] = model.predict(prediction_input)[0]
 
     return missing_features
 
@@ -63,17 +77,22 @@ def predict_bodyfat(model, scaler, imputer, abdomen, bmi, wrist):
     """
     Make a prediction based on the user input.
     """
-    df = pd.DataFrame([[abdomen, bmi, wrist]], columns=['ABDOMEN', 'BMI', 'WRIST'])
+    # Create a DataFrame with placeholder values for all features
+    df = pd.DataFrame([[abdomen, bmi, wrist] + [0] * len(model.feature_names_in_)], columns=model.feature_names_in_)
+    print(df)
+    # Update the DataFrame with actual and estimated feature values
     estimated_features = estimate_missing_features(abdomen, bmi, wrist)
     for feature, value in estimated_features.items():
         df[feature] = value
 
-    expected_columns = list(scaler.feature_names_in_)
-    df = df[expected_columns]
+    # Ensure the order of columns matches what the model expects
+    df = df[model.feature_names_in_]
 
+    # Transform and impute the data
     scaled_data = scaler.transform(df)
     imputed_data = imputer.transform(scaled_data)
 
+    # Predict body fat
     prediction = model.predict(imputed_data)
     return prediction[0]
 
@@ -82,9 +101,9 @@ def app():
     st.title("Body Fat Prediction App")
     st.write("### Enter the values for Abdomen, BMI, and Wrist to predict the body fat percentage!")
 
-    abdomen = st.slider('Abdomen (in inches):', 20.0, 50.0, 30.0)
-    bmi = st.slider('BMI:', 10.0, 40.0, 20.0)
-    wrist = st.slider('Wrist (in inches):', 5.0, 10.0, 6.0)
+    abdomen = st.number_input('Abdomen (in inches):', min_value=20.0, max_value=50.0, value=30.0)
+    bmi = st.number_input('BMI:', min_value=10.0, max_value=40.0, value=20.0)
+    wrist = st.number_input('Wrist (in inches):', min_value=5.0, max_value=10.0, value=6.0)
 
     estimated_features = estimate_missing_features(abdomen, bmi, wrist)
     st.write("Estimated features based on input:")
