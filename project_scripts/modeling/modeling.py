@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 
 def main(use_bootstrap=True):
     data = pd.read_csv(get_path_from_root("data", "preprocessed", "preprocessed_data.csv"))
-    X, y = data.drop('BODYFAT', axis=1), data['BODYFAT']
+
+    # Dropping features that had an R^2 value lower than 0.7 when predicting them based on certain other features
+    X, y = data.drop(['BODYFAT'], axis=1), data['BODYFAT']
 
     splits = 5
 
@@ -28,14 +30,14 @@ def main(use_bootstrap=True):
 
     if use_bootstrap:
         mse_scores, r2_scores = bootstrap_evaluation(model, X, y)
-        logging.info(f"LinReg - RMSE (Bootstrap): {np.mean(np.sqrt(mse_scores))} +/- {np.std(np.sqrt(mse_scores))}")
-        logging.info(f"LinReg - R^2 (Bootstrap): {np.mean(r2_scores)} +/- {np.std(r2_scores)}\n")
+        logging.info(f"RMSE (Bootstrap): {np.mean(np.sqrt(mse_scores))} +/- {np.std(np.sqrt(mse_scores))}")
+        logging.info(f"R^2 (Bootstrap): {np.mean(r2_scores)} +/- {np.std(r2_scores)}\n")
         model.fit(X, y)
     else:
-        rmse_scores, r2_scores = kfold_evaluation(model, X, y, n_split=splits, model_name="Linear_Regression")
+        rmse_scores, r2_scores = kfold_evaluation(model, X, y, n_split=splits, model_name="RidReg")
         # Logging the results
-        logging.info(f"LinReg - RMSE (KFold): {rmse_scores.mean()} +/- {rmse_scores.std()}")
-        logging.info(f"LinReg - R^2 (KFold): {r2_scores.mean()} +/- {r2_scores.std()}\n")
+        logging.info(f"RMSE (KFold): {rmse_scores.mean()} +/- {rmse_scores.std()}")
+        logging.info(f"R^2 (KFold): {r2_scores.mean()} +/- {r2_scores.std()}\n")
         model.fit(X, y)
 
     # Plotting Residuals
@@ -43,8 +45,8 @@ def main(use_bootstrap=True):
 
     # Compute AIC, BIC
     aic, bic = compute_aic_bic(model, X, y)
-    logging.info(f"AIC for Linear Regression: {aic}")
-    logging.info(f"BIC for Linear Regression: {bic}\n")
+    logging.info(f"AIC for Regression: {aic}")
+    logging.info(f"BIC for Regression: {bic}\n")
 
     # Printing top predictors
     logging.info(f"Top Predictors (RidReg): {top_predictors(model, X.columns)[:3]}\n")
@@ -56,7 +58,7 @@ def main(use_bootstrap=True):
     end_time = time.time()
     logging.info(f"Elapsed time for LinReg: {(end_time - start_time):.2f} seconds\n")
 
-    with open(get_path_from_root("code", "models", "LinReg_model_kfold.pkl"), "wb") as model_file:
+    with open(get_path_from_root("project_scripts", "pickle_files", "model.pkl"), "wb") as model_file:
         pickle.dump(model, model_file)
 
 

@@ -5,6 +5,8 @@ from scipy.stats import skew
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import RobustScaler, StandardScaler
 from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+from config import TO_DROP
 from project_scripts.eda.EDA import *
 from project_scripts.utility.data_loader import load_data
 
@@ -22,16 +24,9 @@ def handle_anomalies(data):
     """
     # Simple Anomalies
     data = data[data['BODYFAT'] >= 2]
-    data = data[data['AGE'] >= 18]  # Adult age
-    data = data[data['AGE'] <= 90]  # Reasonable upper limit for dataset
-
-    # Age and Body Fat
-    data = data[~((data['AGE'] <= 25) & (data['BODYFAT'] > 35))]
-    data = data[~((data['AGE'] >= 70) & (data['BODYFAT'] < 5))]
 
     # Anthropometric Measurements
     data = data[data['WRIST'] < data['NECK']]
-    data = data[data['THIGH'] > data['FOREARM']]
 
     # Body Fat and Anthropometric Measurements
     condition_1 = data['BODYFAT'] < 2
@@ -107,7 +102,7 @@ def knn_imputation(data, n_neighbors=5, save_imputer=True):
     imputed_data = imputer.fit_transform(scaled_data)
 
     if save_imputer:
-        joblib.dump(imputer, 'knn_imputer.pkl')
+        joblib.dump(imputer, get_path_from_root("project_scripts", "pickle_files", "knn_imputer.pkl"))
 
     # Inverting the scaling to ensure subsequent steps aren't applied to unnaturally scaled data
     data_array = scaler.inverse_transform(imputed_data)
@@ -171,14 +166,21 @@ def final_robust_scaling(data, save_scaler=True):
     :param data: Input data
     :return: Robust Scaled data
     """
-    bodyfat = data['BODYFAT'].copy()
+    bodyfat = data['BODYFAT'].copy().values.reshape(-1, 1)  # Reshaping it to 2D array
     data_without_target = data.drop('BODYFAT', axis=1)
+
     scaler = RobustScaler()
     scaled_data = scaler.fit_transform(data_without_target)
+
+    target_scaler = RobustScaler()  # Using a separate scaler for the target
+    scaled_target = target_scaler.fit_transform(bodyfat)
     if save_scaler:
-        joblib.dump(scaler,  "robust_scaler.pkl")
+        joblib.dump(scaler,  get_path_from_root("project_scripts", "pickle_files", "robust_scaler.pkl"))
+        joblib.dump(target_scaler, get_path_from_root("project_scripts", "pickle_files", "robust_scaler_target.pkl"))
+
     scaled_df = pd.DataFrame(scaled_data, columns=data_without_target.columns)
-    scaled_df['BODYFAT'] = bodyfat
+    scaled_df_target = pd.DataFrame(scaled_target, columns=['BODYFAT'])
+    scaled_df['BODYFAT'] = scaled_df_target
     return scaled_df
 
 
@@ -218,7 +220,9 @@ def check_for_nan(data, step_name):
 
 
 def main_preprocessing(data, use_rfm=True):
-    data = data.drop(columns=['IDNO', 'DENSITY'])
+    # data = data.drop(columns=TO_DROP)
+    data = data.drop(columns=TO_DROP)
+
     check_for_nan(data, 'dropping columns')
 
     data = handle_anomalies(data)
@@ -244,7 +248,6 @@ def main_preprocessing(data, use_rfm=True):
     check_for_nan(data, 'final_robust_scaling')
 
     return data
-
 
 
 if __name__ == "__main__":
