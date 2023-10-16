@@ -78,8 +78,9 @@ def predict_bodyfat(model, scaler, imputer, abdomen, bmi, wrist):
     Make a prediction based on the user input.
     """
     # Create a DataFrame with placeholder values for all features
-    df = pd.DataFrame([[abdomen, bmi, wrist] + [0] * len(model.feature_names_in_)], columns=model.feature_names_in_)
-    print(df)
+    df = pd.DataFrame([[abdomen, bmi, wrist] + [0] * (len(model.feature_names_in_) - 3)],
+                      columns=model.feature_names_in_)
+
     # Update the DataFrame with actual and estimated feature values
     estimated_features = estimate_missing_features(abdomen, bmi, wrist)
     for feature, value in estimated_features.items():
@@ -101,13 +102,13 @@ def app():
     st.title("Body Fat Prediction App")
     st.write("### Enter the values for Abdomen, BMI, and Wrist to predict the body fat percentage!")
 
-    abdomen = st.number_input('Abdomen (in inches):', min_value=20.0, max_value=50.0, value=30.0)
-    bmi = st.number_input('BMI:', min_value=10.0, max_value=40.0, value=20.0)
-    wrist = st.number_input('Wrist (in inches):', min_value=5.0, max_value=10.0, value=6.0)
+    abdomen = st.number_input('Abdomen (in inches):', min_value=20.0, max_value=50.0, value=30.0, step=0.5)
+    bmi = st.number_input('BMI:', min_value=10.0, max_value=40.0, value=20.0, step=0.5)
+    wrist = st.number_input('Wrist (in inches):', min_value=5.0, max_value=10.0, value=6.0, step=0.25)
 
     estimated_features = estimate_missing_features(abdomen, bmi, wrist)
-    st.write("Estimated features based on input:")
-    st.write(estimated_features)
+    # st.write("Estimated features based on input:")
+    # st.write(estimated_features)
 
     model, scaler, imputer = load_resources()
 

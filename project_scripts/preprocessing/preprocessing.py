@@ -92,11 +92,15 @@ def knn_imputation(data, n_neighbors=5, save_imputer=True):
     :return: Data with imputed values
     """
 
-    # Retain column names
-    column_names = data.columns
+    # Separate the target variable 'BODYFAT'
+    target = data['BODYFAT'].copy()
+    data_without_target = data.drop('BODYFAT', axis=1)
+
+    # Retain column names of predictors
+    column_names = data_without_target.columns
 
     # Scaling since KNNImputer is sensitive to the scale of the data.
-    scaled_data, scaler = scale_data(data)
+    scaled_data, scaler = scale_data(data_without_target)
 
     # Applying the KNNImputer to the data
     imputer = KNNImputer(n_neighbors=n_neighbors)
@@ -108,7 +112,15 @@ def knn_imputation(data, n_neighbors=5, save_imputer=True):
     # Inverting the scaling to ensure subsequent steps aren't applied to unnaturally scaled data
     data_array = scaler.inverse_transform(imputed_data)
 
-    return pd.DataFrame(data_array, columns=column_names)
+    # Convert to DataFrame
+    imputed_df = pd.DataFrame(data_array, columns=column_names)
+    imputed_df = imputed_df.reset_index(drop=True)
+    target = target.reset_index(drop=True)
+
+    # Add back the 'BODYFAT' column
+    imputed_df['BODYFAT'] = target
+
+    return imputed_df
 
 
 def transform_features(data):
@@ -159,12 +171,15 @@ def final_robust_scaling(data, save_scaler=True):
     :param data: Input data
     :return: Robust Scaled data
     """
+    bodyfat = data['BODYFAT'].copy()
+    data_without_target = data.drop('BODYFAT', axis=1)
     scaler = RobustScaler()
-    scaled_data = scaler.fit_transform(data)
+    scaled_data = scaler.fit_transform(data_without_target)
     if save_scaler:
         joblib.dump(scaler,  "robust_scaler.pkl")
-
-    return pd.DataFrame(scaled_data, columns=data.columns)
+    scaled_df = pd.DataFrame(scaled_data, columns=data_without_target.columns)
+    scaled_df['BODYFAT'] = bodyfat
+    return scaled_df
 
 
 def preprocessing_checks(data):
@@ -186,25 +201,50 @@ def preprocessing_checks(data):
     visualize_relationships(data)
 
 
+def check_for_nan(data, step_name):
+    """
+    Log the number of missing values for each column.
+
+    :param data: Input data.
+    :param step_name: The name of the preprocessing step.
+    :return: None
+    """
+    missing_values = data.isnull().sum()
+    columns_with_nan = missing_values[missing_values > 0]
+    if not columns_with_nan.empty:
+        logger.info(f"After {step_name}, columns with NaN values:\n{columns_with_nan}")
+    else:
+        logger.info(f"After {step_name}, no columns with NaN values.")
+
+
 def main_preprocessing(data, use_rfm=True):
     data = data.drop(columns=['IDNO', 'DENSITY'])
+    check_for_nan(data, 'dropping columns')
 
     data = handle_anomalies(data)
+    check_for_nan(data, 'handle_anomalies')
 
     data = calculate_bmi(data)
+    check_for_nan(data, 'calculate_bmi')
 
     # Dropping HEIGHT and WEIGHT when using BMI
     data = data.drop(columns=['HEIGHT', 'WEIGHT'])
+    check_for_nan(data, 'dropping HEIGHT and WEIGHT')
 
     data = handle_outliers(data)
+    check_for_nan(data, 'handle_outliers')
 
     data = knn_imputation(data)
+    check_for_nan(data, 'knn_imputation')
 
     data = transform_features(data)
+    check_for_nan(data, 'transform_features')
 
     data = final_robust_scaling(data)
+    check_for_nan(data, 'final_robust_scaling')
 
     return data
+
 
 
 if __name__ == "__main__":

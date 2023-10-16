@@ -2,7 +2,7 @@ import logging
 
 import pandas as pd
 import pickle
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import LinearRegression, Ridge
 
 from project_scripts.utility.model_utils import bootstrap_evaluation, kfold_evaluation
 from project_scripts.utility.path_utils import get_path_from_root
@@ -31,12 +31,13 @@ def train_and_save_model(X, y, feature_name):
     Train a model for the given feature and save it.
     """
     # Train a Ridge regression model
-    model = Ridge(alpha=0.1, positive=False, solver='auto')
+    # model = Ridge(alpha=0.1, positive=False, solver='auto')
+    model = LinearRegression()
     rmse_scores, r2_scores = kfold_evaluation(model, X, y)
 
-    # logging.info(f"Predicting {feature_name} using {X.columns.tolist()}")
-    # logging.info(f"RidReg - RMSE (KFold): {rmse_scores.mean()} +/- {rmse_scores.std()}")
-    # logging.info(f"RidReg - R^2 (KFold): {r2_scores.mean()} +/- {r2_scores.std()}\n")
+    logging.info(f"Predicting {feature_name} using {X.columns.tolist()}")
+    logging.info(f"RidReg - RMSE (KFold): {rmse_scores.mean()} +/- {rmse_scores.std()}")
+    logging.info(f"RidReg - R^2 (KFold): {r2_scores.mean()} +/- {r2_scores.std()}\n")
     model.fit(X, y)
 
     # Save the trained model

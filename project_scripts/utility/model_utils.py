@@ -3,6 +3,7 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 import seaborn as sns
+from sklearn.linear_model import Ridge
 from sklearn.model_selection import KFold, cross_val_score, train_test_split
 
 from project_scripts.utility.path_utils import get_path_from_root
@@ -37,7 +38,11 @@ def compute_edf(X, alpha):
 
 
 def compute_aic_bic(model, X, y):
-    edf = compute_edf(X, model.alpha)
+    if isinstance(model, Ridge):
+        edf = compute_edf(X, model.alpha)
+    else:
+        edf = X.shape[1] + 1    # Number of predictors + 1 for intercept
+
     predictions = model.predict(X)
     mse = np.mean((predictions - y) ** 2)
     n = len(y)
