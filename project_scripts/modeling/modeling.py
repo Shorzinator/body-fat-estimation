@@ -5,7 +5,7 @@ import time
 
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge
 
 from project_scripts.utility.path_utils import (get_path_from_root)
 from project_scripts.utility.model_utils import bootstrap_evaluation, kfold_evaluation, plot_residuals, top_predictors, \
@@ -27,6 +27,7 @@ def main(use_bootstrap=True):
     start_time = time.time()
 
     model = LinearRegression()
+    # model = Ridge(alpha=0.1, solver='auto', positive=False)
 
     if use_bootstrap:
         mse_scores, r2_scores = bootstrap_evaluation(model, X, y)
@@ -49,7 +50,7 @@ def main(use_bootstrap=True):
     logging.info(f"BIC for Regression: {bic}\n")
 
     # Printing top predictors
-    logging.info(f"Top Predictors (RidReg): {top_predictors(model, X.columns)[:3]}\n")
+    logging.info(f"Top Predictors: {top_predictors(model, X.columns)[:3]}\n")
 
     # Extract regression formula
     formula = generate_regression_formula(model, X.columns)

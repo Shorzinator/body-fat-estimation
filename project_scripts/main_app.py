@@ -4,7 +4,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import joblib
-
+import logging
 
 def gpfr(*subdirs):
     """
@@ -22,25 +22,25 @@ def gpfr(*subdirs):
 
 # Global constants
 MODEL_PATH = gpfr("project_scripts", "pickle_files", "model.pkl")
-SCALER_PATH = gpfr("project_scripts", "pickle_files", "robust_scaler.pkl")
+ROBUST_SCALER_PATH = gpfr("project_scripts", "pickle_files", "robust_scaler_features.pkl")
 IMPUTER_PATH = gpfr("project_scripts", "pickle_files", "knn_imputer.pkl")
 TARGET_SCALER_PATH = gpfr("project_scripts", "pickle_files", "robust_scaler_target.pkl")
+STANDARD_SCALER_PATH = gpfr("project_scripts", "pickle_files", "standard_scaler.pkl")
 
 
 def load_resources():
-    """
-    Load all necessary resources such as a model, scaler, and imputer.
-    """
     with open(MODEL_PATH, "rb") as f:
         model = pickle.load(f)
-    with open(SCALER_PATH, "rb") as f:
-        scaler = joblib.load(f)
+    with open(ROBUST_SCALER_PATH, "rb") as f:
+        robust_scalar_features = joblib.load(f)
     with open(IMPUTER_PATH, "rb") as f:
         imputer = joblib.load(f)
     with open(TARGET_SCALER_PATH, "rb") as f:
-        target_scaler = joblib.load(f)
+        robust_scalar_target = joblib.load(f)
+    with open(STANDARD_SCALER_PATH, "rb") as f:
+        standard_scalar = joblib.load(f)
 
-    return model, scaler, imputer, target_scaler
+    return model, robust_scalar_features, imputer, robust_scalar_target, standard_scalar
 
 
 def estimate_missing_features(abdomen, bmi, wrist):
@@ -50,68 +50,88 @@ def estimate_missing_features(abdomen, bmi, wrist):
         'WRIST': [wrist]
     })
 
-    # Dictionary to hold predicted values for missing features
     missing_features = {}
 
-    # features_to_estimate = ['AGE', 'NECK', 'CHEST', 'HIP', 'THIGH', 'KNEE', 'ANKLE', 'BICEPS', 'FOREARM']
     features_to_estimate = ['CHEST', 'HIP', 'NECK', 'THIGH']
     for feature in features_to_estimate:
         model_path = gpfr("project_scripts", "pickle_files", f"model_for_{feature}.pkl")
         model = joblib.load(model_path)
 
-        # Start by setting all the missing features to their mean/median or any default value
         for missing_feature in features_to_estimate:
             if missing_feature not in input_data.columns:
-                input_data[missing_feature] = [0]  # setting to 0 as a placeholder; it will be replaced soon
+                input_data[missing_feature] = [0]
 
-        # Update the already predicted features
         for k, v in missing_features.items():
             input_data[k] = v
 
-        # Ensure the order of columns matches what the model expects
         prediction_input = input_data[model.feature_names_in_]
-
-        # Predict the feature and store its value
+        print("prediction_input:", prediction_input)
         missing_features[feature] = model.predict(prediction_input)[0]
+        print("missing_feature:", missing_feature)
 
     return missing_features
 
 
-def predict_bodyfat(model, scaler, imputer, abdomen, bmi, wrist):
+def predict_bodyfat(model, robust_scalar_features, imputer, robust_scalar_target, standard_scalar, abdomen, bmi, wrist):
+    logging.basicConfig(level=logging.INFO)
+
     df = pd.DataFrame([[abdomen, bmi, wrist] + [0] * (len(model.feature_names_in_) - 3)],
                       columns=model.feature_names_in_)
+
     df = df[model.feature_names_in_]
 
     estimated_features = estimate_missing_features(abdomen, bmi, wrist)
     for feature, value in estimated_features.items():
         df[feature] = value
+    logging.info(f"Estimated features: \n{estimated_features}")
 
     df = df[model.feature_names_in_]
+    logging.info(f"Original Data: \n{df}")
 
-    scaled_data = scaler.transform(df)
-    imputed_data = imputer.transform(scaled_data)
+    # Standard Scaling
+    scaled_data_standard = standard_scalar.transform(df)
+    logging.info(f"After Standard Scaling: \n{scaled_data_standard}")
 
-    prediction = model.predict(imputed_data)
-    return prediction[0]
+    # KNN Imputation
+    imputed_data = imputer.transform(scaled_data_standard)
+    logging.info(f"After KNN Imputation: \n{imputed_data}")
+
+    # Inverse Standard Scaling
+    unscaled_data = standard_scalar.inverse_transform(imputed_data)
+    logging.info(f"After Inverse Standard Scaling: \n{unscaled_data}")
+
+    # Robust Scaling for Features
+    scaled_data_robust = robust_scalar_features.transform(unscaled_data)
+    logging.info(f"After Robust Scaling: \n{scaled_data_robust}")
+
+    # Making Predictions
+    prediction_scaled = model.predict(scaled_data_robust)
+    logging.info(f"Scaled Prediction: {prediction_scaled}")
+
+    # Inverse Scaling using the Target Scaler
+    prediction = robust_scalar_target.inverse_transform(prediction_scaled.reshape(-1, 1))
+    logging.info(f"Final Prediction after Inverse Target Scaling: {prediction}")
+
+    return prediction[0][0]
+
 
 
 def app():
     st.title("Body Fat Prediction App")
     st.write("### Enter the values for Abdomen, BMI, and Wrist to predict the body fat percentage!")
 
-    abdomen = st.number_input('Abdomen (in inches):', min_value=20.0, max_value=50.0, value=38.0, step=0.5)
-    bmi = st.number_input('BMI:', min_value=10.0, max_value=40.0, value=25.5, step=0.5)
-    wrist = st.number_input('Wrist (in inches):', min_value=5.0, max_value=10.0, value=8.0, step=0.25)
+    abdomen = st.number_input('Abdomen (in inches):', min_value=20.0, max_value=50.0, value=30.0, step=0.5)
+    bmi = st.number_input('BMI:', min_value=10.0, max_value=40.0, value=20.0, step=0.5)
+    wrist = st.number_input('Wrist (in inches):', min_value=5.0, max_value=10.0, value=6.0, step=0.25)
 
-    estimated_features = estimate_missing_features(abdomen, bmi, wrist)
-    # st.write("Estimated features based on input:")
-    # st.write(estimated_features)
+    # estimated_features = estimate_missing_features(abdomen, bmi, wrist)
 
-    model, scaler, imputer, target_scaler = load_resources()
+    model, robust_scalar, imputer, target_scaler, standard_scalar = load_resources()
 
     try:
         with st.spinner("Predicting..."):
-            prediction = predict_bodyfat(model, scaler, imputer, abdomen, bmi, wrist)
+            prediction = predict_bodyfat(model, robust_scalar, imputer, target_scaler, standard_scalar, abdomen, bmi,
+                                         wrist)
         st.write("### Predicted Body Fat %:")
         st.write(str(round(prediction, 2)))
     except Exception as e:

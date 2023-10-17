@@ -48,22 +48,17 @@ def calculate_bmi(data):
     return data
 
 
-def check_vif(data, threshold=15):
+def log_vif(data):
     """
-    Check Variance Inflation Factor (VIF) and drop features with VIF above the threshold.
+    Log Variance Inflation Factor (VIF) for each feature.
     :param data: Input data.
-    :param threshold: VIF Threshold.
-    :return: Data without high VIF features.
+    :return: None
     """
 
     features = data.columns
     vif_data = [variance_inflation_factor(data.values, i) for i in range(data.shape[1])]
     vif_df = pd.DataFrame({'Feature': features, 'VIF': vif_data})
     logging.info(f"VIF values: {vif_df}")
-    features_to_drop = vif_df[vif_df['VIF'] > threshold]['Feature'].tolist()
-    logging.info(f"Features being dropped for having a high VIF: {features_to_drop}")
-    data.drop(columns=features_to_drop, inplace=True)
-    return data
 
 
 def scale_data(data):
@@ -77,11 +72,10 @@ def scale_data(data):
     return pd.DataFrame(scaled_data, columns=data.columns), scaler
 
 
-def knn_imputation(data, n_neighbors=5, save_imputer=True):
+def knn_imputation(data, n_neighbors=5):
     """
     Imputes missing values using KNN imputation.
 
-    :param save_imputer: Whether to save imputer pkl file or not.
     :param data: Input data
     :param n_neighbors: Parameter for KNNImputer
     :return: Data with imputed values
@@ -101,8 +95,8 @@ def knn_imputation(data, n_neighbors=5, save_imputer=True):
     imputer = KNNImputer(n_neighbors=n_neighbors)
     imputed_data = imputer.fit_transform(scaled_data)
 
-    if save_imputer:
-        joblib.dump(imputer, get_path_from_root("project_scripts", "pickle_files", "knn_imputer.pkl"))
+    joblib.dump(imputer, get_path_from_root("project_scripts", "pickle_files", "knn_imputer.pkl"))
+    joblib.dump(scaler, get_path_from_root("project_scripts", "pickle_files", "standard_scaler.pkl"))
 
     # Inverting the scaling to ensure subsequent steps aren't applied to unnaturally scaled data
     data_array = scaler.inverse_transform(imputed_data)
@@ -175,7 +169,7 @@ def final_robust_scaling(data, save_scaler=True):
     target_scaler = RobustScaler()  # Using a separate scaler for the target
     scaled_target = target_scaler.fit_transform(bodyfat)
     if save_scaler:
-        joblib.dump(scaler,  get_path_from_root("project_scripts", "pickle_files", "robust_scaler.pkl"))
+        joblib.dump(scaler,  get_path_from_root("project_scripts", "pickle_files", "robust_scaler_features.pkl"))
         joblib.dump(target_scaler, get_path_from_root("project_scripts", "pickle_files", "robust_scaler_target.pkl"))
 
     scaled_df = pd.DataFrame(scaled_data, columns=data_without_target.columns)
@@ -246,6 +240,8 @@ def main_preprocessing(data, use_rfm=True):
 
     data = final_robust_scaling(data)
     check_for_nan(data, 'final_robust_scaling')
+
+    log_vif(data)
 
     return data
 

@@ -32,8 +32,8 @@ def train_and_save_model(X, y, feature_name):
     Train a model for the given feature and save it.
     """
     # Train a Ridge regression model
-    model = Ridge(alpha=0.1, positive=False, solver='auto')
-    # model = LinearRegression()
+    # model = Ridge(alpha=0.1, positive=False, solver='auto')
+    model = LinearRegression()
     rmse_scores, r2_scores = kfold_evaluation(model, X, y)
 
     logging.info(f"Predicting {feature_name} using {X.columns.tolist()}")
