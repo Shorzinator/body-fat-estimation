@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 def main(use_bootstrap=True):
-    data = pd.read_csv(get_path_from_root("data", "preprocessed", "preprocessed_data.csv"))
+    # data = pd.read_csv(get_path_from_root("data", "preprocessed", "preprocessed_data.csv"))
+    data = pd.read_csv(get_path_from_root("data", "raw", "BodyFat.csv"))
 
     # Dropping features that had an R^2 value lower than 0.7 when predicting them based on certain other features
     X, y = data.drop(['BODYFAT'], axis=1), data['BODYFAT']
