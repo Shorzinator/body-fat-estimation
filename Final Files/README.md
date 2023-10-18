@@ -8,4 +8,4 @@
 - All the plots that were generated during the EDA can be reproduced using the script in project_scripts/EDA/EDA.py (or the [link](https://github.com/Shorzinator/body_fat_estimation/blob/main/project_scripts/EDA/EDA.py)).
 
 ### Output of plots
-These can be found in the results/EDA, results/post_processing, and results/modeling folders. The link to the results folder is [here](https://github.com/Shorzinator/body_fat_estimation/tree/main/results).
+- These can be found in the results/EDA, results/post_processing, and results/modeling folders. The link to the results folder is [here](https://github.com/Shorzinator/body_fat_estimation/tree/main/results).
